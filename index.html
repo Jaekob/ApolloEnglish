@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BOOM! Quiz - Roulette</title>
+    <style>
+        :root {
+            --accent-yellow: #ffd93d;
+            --accent-red: #ff6b6b;
+            --accent-blue: #4dabf7;
+            --accent-pink: #f783ac;
+            --accent-purple: #9775fa;
+            --accent-orange: #ff922b;
+            --accent-green: #51cf66;
+            --text-dark: #0a0a1a;
+            --text-light: #e8eaf6;
+            --card-bg: rgba(15, 15, 40, 0.85);
+            --card-border: rgba(150, 120, 255, 0.3);
+            --card-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            --footer-height: clamp(62px, 12vh, 90px);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #050510;
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── SPACE BACKGROUND ── */
+        #stars-canvas {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+        }
+
+        /* ── NEBULA GLOW ── */
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(ellipse 60% 40% at 20% 30%, rgba(100,60,200,0.18) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 35% at 80% 70%, rgba(40,120,200,0.15) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 30% at 55% 10%, rgba(200,60,100,0.10) 0%, transparent 70%);
+        }
+
+        /* ── START SCREEN ── */
+        #start-screen {
+            position: fixed; inset: 0; z-index: 1000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: radial-gradient(ellipse at center, #1a0a3a 0%, #050510 70%);
+            transition: opacity 0.8s ease, transform 0.8s ease; padding: 20px;
+        }
+        #start-screen.hidden { opacity: 0; transform: scale(1.05); pointer-events: none; }
+        .start-title {
+            font-size: clamp(2.5rem, 10vw, 5.5rem);
+            color: var(--text-light);
+            text-shadow: 0 0 20px var(--accent-purple), 0 0 60px var(--accent-purple), 4px 4px 0 var(--accent-red);
+            margin-bottom: 8px;
+            animation: bounce 1.2s ease-in-out infinite, titleGlow 2s ease-in-out infinite alternate;
+        }
+        @keyframes titleGlow {
+            from { text-shadow: 0 0 20px var(--accent-purple), 4px 4px 0 var(--accent-red); }
+            to   { text-shadow: 0 0 40px var(--accent-blue), 0 0 80px var(--accent-purple), 4px 4px 0 var(--accent-red); }
+        }
+        .start-subtitle { font-size: clamp(0.9rem, 3vw, 1.3rem); color: var(--accent-blue); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 12px; opacity: 0.85; }
+        .start-planets { font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: 30px; animation: orbit 4s ease-in-out infinite; display: block; }
+        @keyframes orbit { 0%,100%{transform:translateY(0) rotate(-5deg);} 50%{transform:translateY(-12px) rotate(5deg);} }
+        .start-btn {
+            padding: 16px 55px; font-size: clamp(1.3rem, 4vw, 1.8rem);
+            background: linear-gradient(135deg, var(--accent-purple), #5a3fc0);
+            color: white; border: 2px solid rgba(200,160,255,0.5);
+            border-radius: 50px; cursor: pointer; font-weight: bold;
+            box-shadow: 0 0 30px rgba(150,100,255,0.6), 0 8px 0 #3a2080;
+            transition: all 0.15s ease; animation: pulse 2.2s ease-in-out infinite;
+        }
+        .start-btn:hover { transform: translateY(-3px); box-shadow: 0 0 50px rgba(150,100,255,0.9), 0 11px 0 #3a2080; }
+        @keyframes bounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+        @keyframes pulse  { 0%,100%{transform:scale(1);} 50%{transform:scale(1.04);} }
+
+        /* ── SETUP SCREEN ── */
+        #setup-screen { position: fixed; inset: 0; z-index: 900; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(5,5,20,0.88); backdrop-filter: blur(12px); padding: 20px; }
+        #setup-screen.active { display: flex; }
+        .setup-box { background: var(--card-bg); border: 1px solid var(--card-border); padding: clamp(25px,6vw,50px); border-radius: 24px; text-align: center; box-shadow: var(--card-shadow), 0 0 60px rgba(100,60,200,0.3); animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from{transform:translateY(40px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+        .setup-title { font-size: clamp(1.4rem,4vw,1.9rem); color: var(--accent-yellow); margin-bottom: 18px; }
+        .setup-input { width: clamp(80px,18vw,110px); font-size: clamp(1.4rem,4vw,1.9rem); padding: 10px; text-align: center; border: 2px solid var(--accent-purple); border-radius: 12px; margin-bottom: 18px; background: rgba(255,255,255,0.08); color: white; }
+        .setup-btn { padding: 13px 45px; font-size: clamp(1.1rem,3.5vw,1.4rem); background: linear-gradient(135deg,var(--accent-purple),#5a3fc0); color: white; border: none; border-radius: 28px; cursor: pointer; font-weight: bold; box-shadow: 0 0 20px rgba(150,100,255,0.4); transition: all 0.2s; }
+        .setup-btn:hover { transform: scale(1.08); box-shadow: 0 0 35px rgba(150,100,255,0.7); }
+
+        /* ── GAME LAYOUT ── */
+        #game-container { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; padding-bottom: var(--footer-height); }
+        #header { background: linear-gradient(135deg, rgba(90,40,160,0.9), rgba(40,20,100,0.95)); border-bottom: 1px solid rgba(150,100,255,0.3); padding: clamp(6px,1.5vw,12px) clamp(12px,3vw,25px); display: flex; align-items: center; justify-content: center; gap: 12px; flex-shrink: 0; }
+        .team-badge { background: linear-gradient(135deg, var(--accent-yellow), #f59f00); color: #1a0a00; padding: clamp(6px,1.5vw,12px) clamp(18px,4vw,35px); border-radius: 40px; font-size: clamp(1.1rem,3.5vw,1.8rem); font-weight: bold; box-shadow: 0 0 20px rgba(255,217,61,0.5), 0 4px 0 #a06000; animation: badgePop 0.3s ease; }
+        @keyframes badgePop { 0%{transform:scale(0.5);} 60%{transform:scale(1.1);} 100%{transform:scale(1);} }
+
+        /* ── MAIN STAGE ── */
+        #stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(6px,1.5vw,12px); gap: clamp(6px,1.5vw,10px); min-height: 0; overflow: hidden; }
+        #prompt-box { background: var(--card-bg); border: 2px solid var(--card-border); color: var(--text-light); padding: clamp(12px,3vw,24px) clamp(16px,4vw,32px); border-radius: 20px; font-size: clamp(1rem,3.2vw,2rem); text-align: center; box-shadow: var(--card-shadow); max-width: 95%; flex-shrink: 0; transition: all 0.4s ease; }
+        #prompt-box.hidden-phase { transform: scale(0.4) rotate(-10deg); opacity: 0; pointer-events: none; max-height: 0; padding: 0; margin: 0; border: none; }
+        @keyframes fadeIn { from{transform:scale(0.85);opacity:0;} to{transform:scale(1);opacity:1;} }
+
+        /* ── CONTROLS ── */
+        #controls { display: flex; gap: clamp(10px,2.5vw,20px); flex-shrink: 0; }
+        .btn { padding: clamp(10px,2.5vw,16px) clamp(22px,5vw,40px); font-size: clamp(0.95rem,2.8vw,1.5rem); border: none; border-radius: 16px; cursor: pointer; font-weight: bold; transition: all 0.2s ease; position: relative; }
+        .btn:active { transform: translateY(3px); }
+        .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+        .btn-green { background: linear-gradient(135deg,#51cf66,#40c057); color: white; box-shadow: 0 5px 0 #2f9e44, 0 0 20px rgba(80,200,100,0.4); }
+        .btn-red   { background: linear-gradient(135deg,#ff6b6b,#fa5252); color: white; box-shadow: 0 5px 0 #c92a2a, 0 0 20px rgba(255,100,100,0.3); }
+
+        /* ── ROULETTE AREA ── */
+        #roulette-area { display: none; flex-direction: column; align-items: center; gap: clamp(6px,1.5vw,10px); width: 100%; flex: 1; min-height: 0; justify-content: center; }
+        #roulette-area.active { display: flex; }
+
+        /* ── WHEEL + LEGEND ── */
+        #wheel-and-legend { display: flex; align-items: center; gap: clamp(10px,2.5vw,20px); justify-content: center; flex-shrink: 0; }
+        #wheel-container { position: relative; width: clamp(140px,38vw,240px); height: clamp(140px,38vw,240px); flex-shrink: 0; }
+        #wheel { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 0 6px rgba(255,255,255,0.15), 0 0 0 9px rgba(150,100,255,0.4), 0 0 40px rgba(150,100,255,0.3), var(--card-shadow); transition: transform 4s cubic-bezier(0.17,0.67,0.12,0.99); position: relative; }
+        #wheel::before { content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:18%; height:18%; background:radial-gradient(circle,#fff,#c0a0ff); border-radius:50%; box-shadow:0 0 15px rgba(200,160,255,0.8); z-index:10; }
+        #wheel::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          pointer-events: none;
+
+          /* thin tick marks every ~10 degrees */
+          background: repeating-conic-gradient(
+              rgba(255,255,255,0.25) 0deg 2deg,
+              transparent 2deg 12deg
+          );
+
+          mix-blend-mode: overlay;
+        }
+        #pointer { position:absolute; top:-22px; left:50%; transform:translateX(-50%); z-index:20; width:0; height:0; border-left:16px solid transparent; border-right:16px solid transparent; border-top:30px solid #ff4466; filter:drop-shadow(0 0 6px rgba(255,50,100,0.8)); }
+        #bomb-visual { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(var(--bomb-scale,1)); width:22%; height:22%; z-index:20; transition:transform 0.5s ease; pointer-events:none; font-size:clamp(1.5rem,6vw,3rem); text-align:center; line-height:100%; }
+        #bomb-visual::before {content:'💣'; animation: bombFloat 2s ease-in-out infinite, bombPulse calc(2s - (var(--bomb-scale) * 1s)) infinite; }
+        @keyframes bombPulse {0%,100% { transform: scale(1); filter: brightness(1); }50% { transform: scale(1.2); filter: brightness(2); } }
+        @keyframes bombFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-5px);} }
+        #bomb-visual.growing { animation:bombGrow 0.5s ease; }
+        @keyframes bombGrow { 0%,100%{filter:brightness(1);} 50%{filter:brightness(2) drop-shadow(0 0 12px orange);} }
+
+        /* ── WHEEL LEGEND ── */
+        #wheel-legend { display:flex; flex-direction:column; gap:4px; background:var(--card-bg); border:1px solid var(--card-border); padding:clamp(8px,2vw,12px); border-radius:12px; box-shadow:var(--card-shadow); min-width:85px; }
+        .legend-item { display:flex; align-items:center; gap:6px; font-size:clamp(0.6rem,1.8vw,0.8rem); font-weight:bold; color:var(--text-light); white-space:nowrap; }
+        .legend-swatch { width:12px; height:12px; border-radius:3px; flex-shrink:0; border:1px solid rgba(255,255,255,0.2); }
+        .legend-pct { color:rgba(200,200,255,0.6); font-weight:normal; font-size:0.85em; }
+
+        /* ── POWERUP BANNER ── */
+        #powerup-banner { display:none; align-items:center; justify-content:center; gap:8px; background:linear-gradient(135deg,rgba(150,100,255,0.25),rgba(80,40,160,0.35)); border:2px solid rgba(180,140,255,0.6); border-radius:14px; padding:clamp(7px,2vw,11px) clamp(14px,3vw,22px); font-size:clamp(0.85rem,2.5vw,1.1rem); font-weight:bold; color:var(--accent-yellow); box-shadow:0 0 20px rgba(150,100,255,0.4); animation:powerupPulse 1.5s ease-in-out infinite; flex-shrink:0; }
+        #powerup-banner.active { display:flex; }
+        @keyframes powerupPulse { 0%,100%{box-shadow:0 0 15px rgba(150,100,255,0.35);} 50%{box-shadow:0 0 30px rgba(150,100,255,0.7);} }
+
+        /* ── TARGET SELECTION ── */
+        #target-selection { display:none; background:var(--card-bg); border:1px solid rgba(255,100,100,0.4); padding:clamp(8px,2vw,14px); border-radius:14px; box-shadow:var(--card-shadow); width:100%; max-width:340px; flex-shrink:0; }
+        #target-selection.active { display:block; }
+        .target-title { font-size:clamp(0.8rem,2.5vw,1rem); color:var(--accent-red); font-weight:bold; margin-bottom:8px; text-align:center; }
+        .target-options { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+        .target-btn { padding:clamp(6px,1.5vw,10px) clamp(12px,3vw,18px); font-size:clamp(0.75rem,2.2vw,0.95rem); border:2px solid var(--accent-red); background:rgba(255,100,100,0.1); color:var(--accent-red); border-radius:10px; cursor:pointer; font-weight:bold; transition:all 0.2s; }
+        .target-btn:hover, .target-btn.selected { background:var(--accent-red); color:white; }
+
+        /* ── SPIN ROW ── */
+        #spin-row { display:flex; align-items:center; gap:clamp(10px,2.5vw,18px); flex-shrink:0; }
+        #spin-btn { padding:clamp(10px,2.5vw,16px) clamp(28px,7vw,55px); font-size:clamp(1.2rem,3.8vw,2rem); background:linear-gradient(135deg,var(--accent-yellow),#f59f00); color:#1a0a00; border:none; border-radius:45px; cursor:pointer; font-weight:bold; box-shadow:0 0 25px rgba(255,210,50,0.5), 0 6px 0 #a06000; transition:all 0.15s ease; }
+        #spin-btn:hover { transform:translateY(-3px); box-shadow:0 0 45px rgba(255,210,50,0.8), 0 9px 0 #a06000; }
+        #spin-btn:active { transform:translateY(3px); box-shadow:0 0 15px rgba(255,210,50,0.4), 0 3px 0 #a06000; }
+        #spin-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+        /* ── POT ── */
+        .pot-display { display:flex; align-items:center; gap:clamp(8px,2vw,14px); flex-shrink:0; }
+        .pot-label { font-size:clamp(0.85rem,2.5vw,1.2rem); color:rgba(200,200,255,0.7); }
+        .pot-value { font-size:clamp(1.8rem,5vw,3rem); color:var(--accent-yellow); font-weight:bold; text-shadow:0 0 15px rgba(255,210,50,0.6); transition:transform 0.2s ease; }
+        .pot-value.bump { animation:potBump 0.3s ease; }
+        @keyframes potBump { 0%,100%{transform:scale(1);} 50%{transform:scale(1.35);} }
+        .bank-btn { padding:clamp(8px,2vw,12px) clamp(16px,4vw,28px); font-size:clamp(0.85rem,2.5vw,1.2rem); background:linear-gradient(135deg,#4dabf7,#339af0); color:white; border:none; border-radius:14px; cursor:pointer; font-weight:bold; box-shadow:0 0 18px rgba(80,170,255,0.4), 0 4px 0 #1971c2; }
+        .bank-btn:active { transform:translateY(2px); box-shadow:0 2px 0 #1971c2; }
+        .bank-btn.hidden { display:none; }
+
+        /* ── RESULT OVERLAY ── */
+        #result-overlay { position:fixed; inset:0; background:rgba(5,5,20,0.9); display:none; align-items:center; justify-content:center; z-index:600; flex-direction:column; gap:20px; backdrop-filter:blur(8px); }
+        #result-overlay.active { display:flex; animation:fadeIn 0.3s ease; }
+        .result-card { background:var(--card-bg); border:1px solid var(--card-border); padding:clamp(25px,7vw,55px); border-radius:28px; text-align:center; animation:resultPop 0.5s ease; box-shadow:var(--card-shadow), 0 0 60px rgba(100,60,200,0.4); max-width:90%; }
+        @keyframes resultPop { 0%{transform:scale(0) rotate(-20deg);} 60%{transform:scale(1.1) rotate(5deg);} 100%{transform:scale(1) rotate(0deg);} }
+        .result-icon { font-size:clamp(3.5rem,13vw,7rem); margin-bottom:10px; animation:iconBounce 0.6s ease infinite; }
+        @keyframes iconBounce { 0%,100%{transform:scale(1);} 50%{transform:scale(1.12);} }
+        .result-title { font-size:clamp(1.4rem,5vw,2.8rem); font-weight:bold; margin-bottom:14px; color:var(--text-light); }
+        .result-teams { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
+        .result-team { background:rgba(255,255,255,0.05); border:1px solid var(--card-border); padding:14px 22px; border-radius:14px; text-align:center; }
+        .result-team-name { font-weight:bold; font-size:clamp(0.9rem,3vw,1.2rem); margin-bottom:5px; }
+        .result-team-score { font-size:clamp(1.4rem,5vw,2.3rem); font-weight:bold; color:var(--accent-yellow); }
+        .result-change { font-size:clamp(0.8rem,2.5vw,1.1rem); margin-top:5px; }
+        .result-change.positive { color:var(--accent-green); }
+        .result-change.negative { color:var(--accent-red); }
+
+        /* ── BOMB OVERLAY ── */
+        #bomb-overlay { position:fixed; inset:0; background:rgba(5,5,20,0.92); display:none; align-items:center; justify-content:center; z-index:600; flex-direction:column; gap:20px; backdrop-filter:blur(10px); }
+        #bomb-overlay.active { display:flex; animation:fadeIn 0.2s ease; }
+        .bomb-text { font-size:clamp(5rem,18vw,9rem); animation:bombShake 0.15s ease infinite; filter:drop-shadow(0 0 30px rgba(255,100,0,0.8)); }
+        @keyframes bombShake { 0%,100%{transform:translate(0,0) rotate(0);} 25%{transform:translate(-5px,5px) rotate(-3deg);} 75%{transform:translate(5px,-5px) rotate(3deg);} }
+        .bomb-message { font-size:clamp(1.3rem,5vw,2.3rem); color:white; text-align:center; padding:0 20px; text-shadow:0 0 20px rgba(255,100,0,0.8); }
+
+        /* ── FOOTER ── */
+        #footer { position:fixed; bottom:0; left:0; right:0; height:var(--footer-height); display:flex; justify-content:center; align-items:center; gap:clamp(4px,1.2vw,10px); padding:8px; background:rgba(10,8,30,0.95); backdrop-filter:blur(12px); border-top:2px solid rgba(150,100,255,0.3); overflow-x:auto; z-index:100; }
+        #footer::-webkit-scrollbar { display:none; }
+        .team-tab { background:rgba(255,255,255,0.06); border:2px solid rgba(150,100,255,0.2); padding:clamp(5px,1.2vw,9px) clamp(9px,2vw,16px); border-radius:11px; text-align:center; cursor:pointer; transition:all 0.3s ease; box-shadow:0 2px 8px rgba(0,0,0,0.4); min-width:clamp(50px,12vw,70px); flex-shrink:0; }
+        .team-tab:hover { transform:translateY(-4px) scale(1.05); }
+        .team-tab.active { background:rgba(255,215,50,0.15); border-color:var(--accent-yellow); box-shadow:0 0 20px rgba(255,215,50,0.35); transform:scale(1.08); }
+        .team-tab.targeted { background:rgba(255,100,100,0.2); border-color:var(--accent-red); box-shadow:0 0 18px rgba(255,100,100,0.4); }
+        .team-tab.targeted .tab-name, .team-tab.targeted .tab-score { color:var(--accent-red); }
+        .tab-name { font-weight:bold; font-size:clamp(0.6rem,1.8vw,0.85rem); color:rgba(200,200,255,0.8); }
+        .tab-score { font-size:clamp(1rem,3vw,1.5rem); font-weight:bold; color:var(--accent-yellow); }
+
+        /* ── EFFECTS ── */
+        #effects-overlay { position:fixed; inset:0; pointer-events:none; z-index:500; }
+        .effect-text { position:absolute; font-size:clamp(2rem,7vw,4.5rem); font-weight:bold; animation:effectPop 1.5s ease forwards; text-shadow:0 0 20px currentColor, 3px 3px 0 rgba(0,0,0,0.4); pointer-events:none; }
+        @keyframes effectPop { 0%{transform:scale(0) rotate(-20deg);opacity:1;} 30%{transform:scale(1.8) rotate(10deg);opacity:1;} 100%{transform:scale(3) translateY(-100px) rotate(-30deg);opacity:0;} }
+        .particle { position:absolute; width:8px; height:8px; border-radius:50%; pointer-events:none; animation:particleFly 1s ease forwards; }
+        @keyframes particleFly { 0%{transform:translate(0,0) scale(1);opacity:1;} 100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0;} }
+        .shake { animation:shake 0.6s ease; }
+        @keyframes shake { 0%,100%{transform:translateX(0);} 15%{transform:translateX(-25px) rotate(-2deg);} 30%{transform:translateX(25px) rotate(2deg);} 50%{transform:translateX(-18px);} 70%{transform:translateX(18px);} 90%{transform:translateX(-8px);} }
+
+        /* ── STAR SPIN ANNOUNCE ── */
+        #rare-announce { position:fixed; top:15%; left:50%; transform:translateX(-50%); z-index:700; background:linear-gradient(135deg,rgba(150,100,255,0.9),rgba(80,40,180,0.95)); border:2px solid rgba(200,160,255,0.8); border-radius:20px; padding:18px 32px; text-align:center; display:none; box-shadow:0 0 50px rgba(150,100,255,0.8); animation:announceSlide 0.4s ease; }
+        #rare-announce.active { display:block; }
+        @keyframes announceSlide { from{transform:translateX(-50%) translateY(-30px);opacity:0;} to{transform:translateX(-50%) translateY(0);opacity:1;} }
+        .rare-announce-icon { font-size:2.5rem; display:block; margin-bottom:6px; }
+        .rare-announce-text { font-size:1.1rem; font-weight:bold; color:white; }
+        .rare-announce-sub { font-size:0.85rem; color:rgba(200,180,255,0.8); margin-top:4px; }
+    </style>
+</head>
+<body>
+
+<!-- STAR CANVAS -->
+<canvas id="stars-canvas"></canvas>
+
+<!-- START SCREEN -->
+<div id="start-screen">
+    <h1 class="start-title">💥 BOOM! QUIZ</h1>
+    <p class="start-subtitle">🚀 Galactic Roulette Risk</p>
+    <span class="start-planets">🪐✨🌌</span>
+    <button class="start-btn" onclick="showSetup()">🚀 LAUNCH!</button>
+</div>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+    <div class="setup-box">
+        <h2 class="setup-title">🌠 How many teams?</h2>
+        <input type="number" id="team-input" class="setup-input" value="4" min="2" max="8">
+        <br>
+        <button class="setup-btn" onclick="startGame()">⭐ START MISSION!</button>
+    </div>
+</div>
+
+<!-- GAME CONTAINER -->
+<div id="game-container">
+    <header id="header">
+        <div class="team-badge" id="cur-name">Team 1</div>
+    </header>
+    <main id="stage">
+        <div id="prompt-box">Press CORRECT to spin! 🚀</div>
+        <div id="controls">
+            <button class="btn btn-red" id="skip-btn" onclick="skipTeam()">SKIP</button>
+            <button class="btn btn-green" id="correct-btn" onclick="revealRoulette()">CORRECT ✓</button>
+        </div>
+        <div id="roulette-area">
+            <div id="wheel-and-legend">
+                <div id="wheel-container">
+                    <div id="pointer"></div>
+                    <div id="wheel"></div>
+                    <div id="bomb-visual"></div>
+                </div>
+                <div id="wheel-legend"></div>
+            </div>
+
+            <div id="powerup-banner"></div>
+
+            <div id="target-selection">
+                <div class="target-title">🎯 SELECT TARGET TEAM</div>
+                <div class="target-options" id="target-options"></div>
+            </div>
+
+            <div id="spin-row">
+                <button id="spin-btn" onclick="spinWheel()">🌀 SPIN!</button>
+            </div>
+            <div class="pot-display">
+                <span class="pot-label">⭐ POT:</span>
+                <span class="pot-value" id="pot-display">0</span>
+                <button class="bank-btn hidden" id="bank-btn" onclick="bankPoints()">💰 BANK</button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- FOOTER -->
+<footer id="footer"></footer>
+
+<!-- RARE ANNOUNCE -->
+<div id="rare-announce">
+    <span class="rare-announce-icon" id="rare-announce-icon">⭐</span>
+    <div class="rare-announce-text" id="rare-announce-text">POWER-UP UNLOCKED!</div>
+    <div class="rare-announce-sub" id="rare-announce-sub">Land on ⭐ to activate!</div>
+</div>
+
+<!-- RESULT OVERLAY -->
+<div id="result-overlay">
+    <div class="result-card">
+        <div class="result-icon" id="result-icon">💥</div>
+        <div class="result-title" id="result-title">Result!</div>
+        <div class="result-teams" id="result-teams"></div>
+    </div>
+</div>
+
+<!-- BOMB OVERLAY -->
+<div id="bomb-overlay">
+    <div class="bomb-text">💥</div>
+    <div class="bomb-message" id="bomb-message">Pot lost!</div>
+</div>
+
+<!-- EFFECTS OVERLAY -->
+<div id="effects-overlay"></div>
+
+<script>
+/* ═══════════════════════════════════
+   STAR BACKGROUND
+═══════════════════════════════════ */
+(function initStars() {
+    const canvas = document.getElementById('stars-canvas');
+    const ctx = canvas.getContext('2d');
+    let stars = [];
+    let shootingStars = [];
+    let W, H;
+
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        stars = Array.from({ length: 180 }, () => ({
+            x: Math.random() * W, y: Math.random() * H,
+            r: Math.random() * 1.6 + 0.2,
+            alpha: Math.random() * 0.7 + 0.3,
+            speed: Math.random() * 0.4 + 0.1,
+            twinkleOffset: Math.random() * Math.PI * 2
+        }));
+    }
+
+    function spawnShootingStar() {
+        shootingStars.push({
+            x: Math.random() * W * 0.7,
+            y: Math.random() * H * 0.4,
+            len: Math.random() * 100 + 60,
+            speed: Math.random() * 8 + 6,
+            alpha: 1,
+            angle: Math.PI / 4 + (Math.random() - 0.5) * 0.3
+        });
+    }
+
+    setInterval(spawnShootingStar, 3500);
+
+    let t = 0;
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+        t += 0.012;
+
+        // Static stars with twinkle
+        stars.forEach(s => {
+            const a = s.alpha * (0.6 + 0.4 * Math.sin(t * s.speed + s.twinkleOffset));
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(220,220,255,${a})`;
+            ctx.fill();
+        });
+
+        // Shooting stars
+        shootingStars = shootingStars.filter(s => s.alpha > 0);
+        shootingStars.forEach(s => {
+            const grad = ctx.createLinearGradient(s.x, s.y, s.x - Math.cos(s.angle) * s.len, s.y - Math.sin(s.angle) * s.len);
+            grad.addColorStop(0, `rgba(255,255,255,${s.alpha})`);
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.beginPath();
+            ctx.moveTo(s.x, s.y);
+            ctx.lineTo(s.x - Math.cos(s.angle) * s.len, s.y - Math.sin(s.angle) * s.len);
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            s.x += Math.cos(s.angle) * s.speed;
+            s.y += Math.sin(s.angle) * s.speed;
+            s.alpha -= 0.018;
+        });
+
+        requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    draw();
+})();
+
+/* ═══════════════════════════════════
+   QUESTIONS
+═══════════════════════════════════ */
+/*
+Icon	Grammar Target	Japanese Hint
+📅	I'm going to...	よてい (Plan)
+✨	I want to...	したいい (Wish)
+🙋	I will...	するよ！ (Decision/Action)
+*/
+const QUESTIONS = [
+    "📅 ⚾ (go to baseball club)",
+    "📅 📝 (study English)",
+    "📅 ⚽ (play soccer)",
+    "📅 🏫 (go to school)",
+    "📅 🧹 (clean my room)",
+    "📅 🎹 (practice piano)",
+    "📅 👟 (buy new shoes)",
+    "📅 🍿 (watch a movie)",
+    "📅 🦷 (go to the dentist)",
+    "📅 🍳 (cook dinner)",
+    "📅 📖 (read a book)",
+    "📅 🏊 (go swimming)",
+    "📅 🛍️ (go shopping)",
+    "📅 🌳 (go to the park)",
+    "📅 🚌 (visit my grandma)",
+    "📅 💻 (do my homework)",
+    "✨ 🍦 (eat ice cream)",
+    "✨ 🎮 (play video games)",
+    "✨ 🇺🇸 (visit America)",
+    "✨ 👨‍⚕️ (be a doctor)",
+    "✨ 🎸 (play guitar)",
+    "✨ 🐱 (get a pet cat)",
+    "✨ 🍕 (eat pizza)",
+    "✨ 🏰 (go to Disneyland)",
+    "✨ 🎤 (sing a song)",
+    "✨ 📸 (take photos)",
+    "✨ 🥞 (eat pancakes)",
+    "✨ 🚲 (get a new bike)",
+    "✨ 🌌 (see the stars)",
+    "✨ 👑 (be famous)",
+    "✨ 🧪 (study science)",
+    "✨ 🍹 (drink juice)",
+    "✨ 🎁 (get a present)",
+    "🙋 🥤 (bring some water)",
+    "🙋 🚪 (open the window)",
+    "🙋 🧺 (help my mom)",
+    "🙋 🙋 (answer the question)",
+    "🙋 🎒 (carry your bag)",
+    "🙋 🧼 (wash the dishes)",
+    "🙋 🐕 (walk the dog)",
+    "🙋 📧 (write an email)",
+    "🙋 🍎 (eat an apple now)",
+    "🙋 🤫 (be quiet)",
+    "🙋 🤝 (help my friend)",
+    "🙋 🚶 (go with you)",
+    "🙋 📸 (take your picture)",
+    "🙋 🖍️ (draw a map)",
+    "🙋 🌂 (lend my umbrella)",
+    "🙋 💡 (turn off the light)",
+    "🙋 🥛 (drink some milk)"
+];
+
+/* ═══════════════════════════════════
+   RARE POWER-UPS (auto-assigned)
+═══════════════════════════════════ */
+const RARE_POWERS = [
+    { id: 'double',    name: 'DOUBLE POT',   icon: '⚡', sub: 'Land ⭐ to double your pot!',     needsTarget: false },
+    { id: 'plantBomb', name: 'PLANT BOMB',   icon: '💣', sub: 'Land ⭐ to bomb another team!',   needsTarget: true  },
+    { id: 'shield',    name: 'STAR SHIELD',  icon: '🛡️', sub: 'Land ⭐ to ignore next bomb!',    needsTarget: false }
+];
+
+/* ═══════════════════════════════════
+   WHEEL SEGMENT DEFINITIONS
+═══════════════════════════════════ */
+const WHEEL_LEGEND_ITEMS = [
+    { label: '+1', color: '#ffd93d', baseCount: 3, type: 'points', value: 1 },
+    { label: '+2', color: '#4dabf7', baseCount: 2, type: 'points', value: 2 },
+    { label: '+3', color: '#ff6b6b', baseCount: 1, type: 'points', value: 3 },
+    { label: '⭐ RARE', color: '#ff922b', baseCount: 1, type: 'rare' },
+    { label: '💣 BOMB', color: '#9775fa', baseCount: 0, type: 'bomb' }
+];
+
+/* ═══════════════════════════════════
+   GAME STATE
+═══════════════════════════════════ */
+let gameState = {
+    teams: [],
+    activeIndex: 0,
+    pot: 0,
+    roundActive: false,
+    spinLocked: false,
+    bombChance: 10,
+    activeRare: null,       // { id, name, icon, needsTarget } or null
+    rareOnWheel: false,     // whether rare slice is on wheel this round
+    targetTeamIdx: null,
+    pendingBombTargets: {},
+    shielded: {}            // teamIdx -> true if shielded
+};
+
+/* ═══════════════════════════════════
+   WHEEL BUILDER
+═══════════════════════════════════ */
+function buildWheelGradient(bombChancePct) {
+    const hasRare = gameState.rareOnWheel;
+    const nonBomb = WHEEL_LEGEND_ITEMS.filter(s => {
+        if (s.type === 'bomb') return false;
+        if (s.type === 'rare' && !hasRare) return false;
+        return true;
+    });
+    const totalCount = nonBomb.reduce((s, x) => s + x.baseCount, 0);
+    const bombDeg = 360 * (bombChancePct / 100);
+    const remainDeg = 360 - bombDeg;
+
+    const slices = [];
+    let cursor = 0;
+    nonBomb.forEach(seg => {
+        const deg = remainDeg * (seg.baseCount / totalCount);
+        slices.push({ ...seg, start: cursor, end: cursor + deg });
+        cursor += deg;
+    });
+    slices.push({ type: 'bomb', color: '#9775fa', start: cursor, end: 360 });
+
+    const stops = slices.map(s => `${s.color} ${s.start.toFixed(2)}deg ${s.end.toFixed(2)}deg`).join(', ');
+    document.getElementById('wheel').style.background = `conic-gradient(${stops})`;
+
+    // Update legend
+    const legendEl = document.getElementById('wheel-legend');
+    legendEl.innerHTML = '';
+    nonBomb.forEach(seg => {
+        const pct = Math.round((seg.baseCount / totalCount) * (100 - bombChancePct));
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `<span class="legend-swatch" style="background:${seg.color}"></span>${seg.label} <span class="legend-pct">${pct}%</span>`;
+        legendEl.appendChild(item);
+    });
+    const bombItem = document.createElement('div');
+    bombItem.className = 'legend-item';
+    bombItem.innerHTML = `<span class="legend-swatch" style="background:#9775fa"></span>💣 BOMB <span class="legend-pct">${bombChancePct}%</span>`;
+    legendEl.appendChild(bombItem);
+
+    return slices; // used by spin result calc
+}
+
+/* ═══════════════════════════════════
+   SCREEN MANAGEMENT
+═══════════════════════════════════ */
+function showSetup() {
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('setup-screen').classList.add('active');
+}
+
+function startGame() {
+    const teamCount = parseInt(document.getElementById('team-input').value) || 4;
+    gameState.teams = [];
+    for (let i = 0; i < teamCount; i++) {
+        gameState.teams.push({ name: `Team ${i + 1}`, score: 0 });
+    }
+    document.getElementById('setup-screen').classList.remove('active');
+    Object.assign(gameState, {
+        activeIndex: 0, pot: 0, roundActive: false, spinLocked: false,
+        bombChance: 10, activeRare: null, rareOnWheel: false,
+        targetTeamIdx: null, pendingBombTargets: {}, shielded: {}
+    });
+    buildWheelGradient(10);
+    renderFooter();
+    updateUI();
+    nextPrompt();
+}
+
+function nextPrompt() {
+    const q = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+    const box = document.getElementById('prompt-box');
+    box.classList.remove('hidden-phase');
+    box.innerText = q;
+    box.style.animation = 'none';
+    setTimeout(() => box.style.animation = 'fadeIn 0.5s ease', 10);
+}
+
+/* ═══════════════════════════════════
+   UI UPDATE
+═══════════════════════════════════ */
+function updateUI() {
+    const team = gameState.teams[gameState.activeIndex];
+    document.getElementById('cur-name').innerText = `🚀 ${team.name}`;
+    document.getElementById('pot-display').innerText = gameState.pot;
+    updateBombVisual();
+    renderFooter();
+    updateTargetSelection();
+}
+
+function updateBombVisual() {
+    buildWheelGradient(gameState.bombChance);
+    const bombVisual = document.getElementById('bomb-visual');
+    const scale = 0.7 + (gameState.bombChance / 100) * 0.8;
+    bombVisual.style.setProperty('--bomb-scale', scale);
+}
+
+function renderFooter() {
+    const footer = document.getElementById('footer');
+    footer.innerHTML = gameState.teams.map((team, i) => {
+        const isTargeted = gameState.pendingBombTargets[i] !== undefined;
+        const isShielded = gameState.shielded[i];
+        const isActive = i === gameState.activeIndex;
+        const badge = isTargeted ? ' 💣' : isShielded ? ' 🛡️' : '';
+        return `<div class="team-tab ${isActive?'active':''} ${isTargeted?'targeted':''}" onclick="manualScore(${i})">
+            <div class="tab-name">${team.name}${badge}</div>
+            <div class="tab-score" id="score-${i}">${team.score}</div>
+        </div>`;
+    }).join('');
+}
+
+function updateTargetSelection() {
+    const container = document.getElementById('target-options');
+    const section = document.getElementById('target-selection');
+
+    if (!gameState.rareOnWheel || !gameState.activeRare || !gameState.activeRare.needsTarget) {
+        section.classList.remove('active');
+        return;
+    }
+    section.classList.add('active');
+    container.innerHTML = gameState.teams
+        .map((team, i) => i !== gameState.activeIndex ? `
+            <button class="target-btn ${gameState.targetTeamIdx === i ? 'selected' : ''}"
+                    onclick="selectTarget(${i})" ${gameState.spinLocked ? 'disabled' : ''}>
+                ${team.name}
+            </button>` : '').join('');
+}
+
+function selectTarget(idx) {
+    if (gameState.spinLocked) return;
+    gameState.targetTeamIdx = idx;
+    updateTargetSelection();
+}
+
+/* ═══════════════════════════════════
+   GAME LOGIC
+═══════════════════════════════════ */
+function revealRoulette() {
+    if (gameState.roundActive) return;
+    gameState.roundActive = true;
+    gameState.spinLocked = false;
+
+    // Pending bomb check
+    if (gameState.pendingBombTargets[gameState.activeIndex] !== undefined) {
+        gameState.bombChance = gameState.pendingBombTargets[gameState.activeIndex];
+        delete gameState.pendingBombTargets[gameState.activeIndex];
+    } else {
+        gameState.bombChance = 10;
+    }
+
+    // 10% chance to get a random rare power-up this round
+    gameState.rareOnWheel = Math.random() < 0.10;
+    gameState.activeRare = null;
+    gameState.targetTeamIdx = null;
+
+    if (gameState.rareOnWheel) {
+        gameState.activeRare = RARE_POWERS[Math.floor(Math.random() * RARE_POWERS.length)];
+        showRareAnnounce(gameState.activeRare);
+    }
+
+    document.getElementById('roulette-area').classList.add('active');
+    document.getElementById('prompt-box').classList.add('hidden-phase');
+    document.getElementById('pot-display').innerText = '0';
+    document.getElementById('bank-btn').classList.add('hidden');
+    document.getElementById('spin-btn').disabled = false;
+
+    const wheel = document.getElementById('wheel');
+    wheel.style.transition = 'none';
+    wheel.style.transform = 'rotate(0deg)';
+    setTimeout(() => { wheel.style.transition = 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)'; }, 50);
+
+    gameState.pot = 0;
+    updateBombVisual();
+    updateTargetSelection();
+
+    // Update powerup banner
+    const banner = document.getElementById('powerup-banner');
+    if (gameState.rareOnWheel && gameState.activeRare) {
+        banner.className = 'active';
+        banner.innerHTML = `${gameState.activeRare.icon} <span>${gameState.activeRare.name} active — land ⭐ to activate!</span>`;
+    } else {
+        banner.className = '';
+        banner.innerHTML = '';
+    }
+}
+
+function showRareAnnounce(rare) {
+    const el = document.getElementById('rare-announce');
+    document.getElementById('rare-announce-icon').innerText = rare.icon;
+    document.getElementById('rare-announce-text').innerText = `⭐ ${rare.name} UNLOCKED!`;
+    document.getElementById('rare-announce-sub').innerText = rare.sub;
+    el.classList.add('active');
+    setTimeout(() => el.classList.remove('active'), 2800);
+}
+
+let currentRotation = 0;
+
+function spinWheel() {
+    if (!gameState.roundActive || gameState.spinLocked) return;
+
+    if (gameState.activeRare && gameState.activeRare.needsTarget && gameState.targetTeamIdx === null) {
+        showEffect('Pick target!', '#ff6b6b');
+        return;
+    }
+
+    gameState.spinLocked = true;
+    document.getElementById('spin-btn').disabled = true;
+
+    const wheel = document.getElementById('wheel');
+    const slices = buildWheelGradient(gameState.bombChance);
+
+    // 🎯 PICK RESULT
+    const rand = Math.random() * 360;
+    const hit = slices.find(s => rand >= s.start && rand < s.end) || slices[slices.length - 1];
+
+    // 🎯 TARGET ANGLE (center of slice)
+    const sliceSize = hit.end - hit.start;
+
+    // stay away from edges (15% padding on each side)
+    const padding = sliceSize * 0.15;
+
+    const targetAngle = hit.start + padding + Math.random() * (sliceSize - padding * 2);
+    const finalAngle = 360 - targetAngle;
+
+    // 🎯 ALWAYS BIG SPIN
+    const spins = 8 + Math.floor(Math.random() * 3); // 8–10 spins
+
+    // ALWAYS move forward from current position
+    const currentNormalized = currentRotation % 360;
+    const deltaToTarget = (360 - currentNormalized + finalAngle) % 360;
+
+    const totalRotation = currentRotation + spins * 360 + deltaToTarget;
+
+    currentRotation = totalRotation;
+
+    startTicking();
+
+    wheel.style.transition = 'transform 3.2s cubic-bezier(0.2,0.7,0.2,1)';
+    wheel.style.transform = `rotate(${totalRotation}deg)`;
+
+    // ✅ CLEAN FINISH (no snap!)
+    setTimeout(() => {
+        stopTicking();
+        playTick(); // final "click"
+        resolveHit(hit);
+    }, 3200);
+}
+
+function resolveHit(hit) {
+    if (hit.type === 'rare')  { handleStarSpin(); return; }
+    if (hit.type === 'bomb')  { handleBomb();     return; }
+    handlePoints(hit.value || 1);
+}
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTick() {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'square';
+    osc.frequency.value = 1000;
+
+    gain.gain.value = 0.05;
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.03);
+}
+
+let ticking = false;
+
+function startTicking() {
+    ticking = true;
+
+    let delay = 40;
+
+    function tickLoop() {
+        if (!ticking) return;
+
+        playTick();
+
+        delay += 6; // slows down over time
+        setTimeout(tickLoop, delay);
+    }
+
+    tickLoop();
+}
+
+function stopTicking() {
+    ticking = false;
+}
+
+function handlePoints(points) {
+    gameState.pot += points;
+    const potDisplay = document.getElementById('pot-display');
+    potDisplay.innerText = gameState.pot;
+    potDisplay.classList.remove('bump');
+    void potDisplay.offsetWidth;
+    potDisplay.classList.add('bump');
+
+    gameState.bombChance = Math.min(90, gameState.bombChance + 10);
+
+    const bombVisual = document.getElementById('bomb-visual');
+
+    // delay so the wheel visually settles first
+    setTimeout(() => {
+        bombVisual.classList.add('growing');
+
+        setTimeout(() => {
+            bombVisual.classList.remove('growing');
+        }, 500);
+
+    }, 350); // tweak between 250–500ms to taste
+
+    updateBombVisual();
+    showEffect(`+${points}`, '#51cf66');
+    createParticles(potDisplay, '#51cf66');
+
+    document.getElementById('bank-btn').classList.remove('hidden');
+    gameState.spinLocked = false;
+    document.getElementById('spin-btn').disabled = false;
+}
+
+function handleStarSpin() {
+    showEffect('⭐', '#ffd43b');
+    createParticles(document.getElementById('wheel-container'), '#ffd43b', 20);
+
+    if (!gameState.activeRare) {
+        handlePoints(2);
+        return;
+    }
+
+    const rare = gameState.activeRare;
+
+    if (rare.id === 'double') {
+        if (gameState.pot === 0) gameState.pot = 1;
+        gameState.pot *= 2;
+        document.getElementById('pot-display').innerText = gameState.pot;
+        showEffect('⚡ x2!', '#9775fa');
+        document.getElementById('bank-btn').classList.remove('hidden');
+        gameState.spinLocked = false;
+        document.getElementById('spin-btn').disabled = false;
+        return;
+    }
+
+    if (rare.id === 'plantBomb' && gameState.targetTeamIdx !== null) {
+        gameState.pendingBombTargets[gameState.targetTeamIdx] = 80;
+        showEffect('💣 PLANTED!', '#ff6b6b');
+        document.getElementById('bank-btn').classList.remove('hidden');
+        gameState.spinLocked = false;
+        document.getElementById('spin-btn').disabled = false;
+        renderFooter();
+        return;
+    }
+
+    if (rare.id === 'shield') {
+        gameState.shielded[gameState.activeIndex] = true;
+        showEffect('🛡️ SHIELDED!', '#4dabf7');
+        document.getElementById('bank-btn').classList.remove('hidden');
+        gameState.spinLocked = false;
+        document.getElementById('spin-btn').disabled = false;
+        renderFooter();
+        return;
+    }
+
+    handlePoints(2);
+}
+
+function handleBomb() {
+    // Shield check
+    if (gameState.shielded[gameState.activeIndex]) {
+        delete gameState.shielded[gameState.activeIndex];
+        showEffect('🛡️ BLOCKED!', '#4dabf7');
+        gameState.spinLocked = false;
+        document.getElementById('spin-btn').disabled = false;
+        renderFooter();
+        return;
+    }
+
+    gameState.spinLocked = true;
+    document.getElementById('spin-btn').disabled = true;
+    document.getElementById('game-container').classList.add('shake');
+    createParticles(document.getElementById('wheel-container'), '#ff6b6b', 30);
+
+    const bombOverlay = document.getElementById('bomb-overlay');
+    document.getElementById('bomb-message').innerText = `${gameState.teams[gameState.activeIndex].name} loses pot! 💫`;
+    bombOverlay.classList.add('active');
+    showEffect('BOOM!', '#ff6b6b');
+
+    setTimeout(() => {
+        document.getElementById('game-container').classList.remove('shake');
+        bombOverlay.classList.remove('active');
+        cycleTeam();
+    }, 2500);
+}
+
+function bankPoints() {
+    if (gameState.spinLocked) return;
+    gameState.teams[gameState.activeIndex].score += gameState.pot;
+    showEffect(`+${gameState.pot} ⭐`, '#ffd93d');
+    createParticles(document.getElementById('pot-display'), '#ffd43b', 15);
+    cycleTeam();
+}
+
+function skipTeam() {
+    showEffect('SKIP', '#4dabf7');
+    cycleTeam();
+}
+
+function cycleTeam() {
+    gameState.roundActive = false;
+    gameState.spinLocked = false;
+    document.getElementById('roulette-area').classList.remove('active');
+    document.getElementById('bank-btn').classList.add('hidden');
+    document.getElementById('target-selection').classList.remove('active');
+    document.getElementById('powerup-banner').className = '';
+
+    gameState.activeIndex = (gameState.activeIndex + 1) % gameState.teams.length;
+    gameState.pot = 0;
+    gameState.activeRare = null;
+    gameState.rareOnWheel = false;
+    gameState.targetTeamIdx = null;
+
+    updateUI();
+    nextPrompt();
+}
+
+/* ═══════════════════════════════════
+   EFFECTS
+═══════════════════════════════════ */
+function showEffect(text, color) {
+    const overlay = document.getElementById('effects-overlay');
+    const effect = document.createElement('div');
+    effect.className = 'effect-text';
+    effect.innerText = text;
+    effect.style.color = color;
+    effect.style.left = `${20 + Math.random() * 60}%`;
+    effect.style.top = `${20 + Math.random() * 50}%`;
+    overlay.appendChild(effect);
+    setTimeout(() => effect.remove(), 1500);
+}
+
+function createParticles(element, color, count = 8) {
+    const rect = element.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const overlay = document.getElementById('effects-overlay');
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.background = color;
+        p.style.left = `${centerX}px`;
+        p.style.top = `${centerY}px`;
+        p.style.setProperty('--tx', `${(Math.random() - 0.5) * 200}px`);
+        p.style.setProperty('--ty', `${(Math.random() - 0.5) * 200}px`);
+        overlay.appendChild(p);
+        setTimeout(() => p.remove(), 1000);
+    }
+}
+
+function manualScore(idx) {
+    const team = gameState.teams[idx];
+    const newScore = prompt(`New score for ${team.name}?`, team.score);
+    if (newScore !== null && !isNaN(parseInt(newScore))) {
+        team.score = parseInt(newScore);
+        updateUI();
+    }
+}
+
+window.addEventListener('load', () => buildWheelGradient(10));
+</script>
+</body>
+</html>
